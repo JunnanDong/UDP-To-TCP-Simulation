@@ -8,7 +8,7 @@ from multiprocessing import Semaphore
 
 stop_flag = 0
 split_element = ":#:"
-#滑动窗口类
+#slide window class
 class packet_window(list):
     size: int
     time_record: list
@@ -21,8 +21,8 @@ class packet_window(list):
             self.time_record.append(0)
         self.size = size
         self.seq = 0
-        self.lock = threading.Lock()    #访问窗口锁
-        self.empty_sem = Semaphore(size) #设置信号量为窗口大小
+        self.lock = threading.Lock()    #visit window lock
+        self.empty_sem = Semaphore(size) #set window size
     def slide(self, len):
         size = self.size
         if len >  size:
@@ -52,9 +52,9 @@ class packet_window(list):
             result = func(self[index])
             if result is not None:
                 if result == -1:
-                    return -1  #表示收到stop命令
+                    return -1  #recieve stop
         self.slide(len)
-        return len             #大于零表示划出的窗口有多少个
+        return len             #if larger than 0, indicating the number of those sliding out ofthe window
 
 # connect_info class
 class connect_info:
@@ -116,10 +116,10 @@ class connect_info:
         recv_start_seq = self.recv_q.seq
         dst_seq, dst_ack = self._decode_msg(msg)
         recv_index = dst_seq - recv_start_seq
-        #如果recv_index > window_size丢弃 
+        #if recv_index > window_size, than abandon
         if (recv_index > self.win_size):
             return 0
-        # 如果recv_index<0 是对面重传的包
+        # if recv_index<0, indicating the resent packages
         if (recv_index >= 0):
             self.recv_q.lock.acquire()
             self.recv_q[recv_index] = msg
@@ -135,7 +135,7 @@ class connect_info:
             print("size" + str(slide_size))
             self.send_q.lock.release()
             for i in range(slide_size):
-                self.send_q.empty_sem.release() #释放信号量，产生空的窗口位
+                self.send_q.empty_sem.release() #release new windows
         return 0
     def _encode_msg(self, seq, msg:bytes):
         head = str(seq) + split_element + str(self.ack) + split_element
@@ -145,14 +145,14 @@ class connect_info:
         seq = int(msg.split(split_element.encode("utf-8"))[0])
         ack = int(msg.split(split_element.encode("utf-8"))[1])
         return seq, ack
-    def add_to_send_queue(self, msg: bytes):  #发包队列统一接口
-        self.send_q.empty_sem.acquire()  #请求一个信号量, 占用一个空的窗口位
+    def add_to_send_queue(self, msg: bytes):  #
+        self.send_q.empty_sem.acquire()  
         self.send_q.lock.acquire()
         self.send_q.add_to_queue(self.seq, msg)
         self.send_q.lock.release()
         self.seq += 1
         return
-    def send_file_block(self, file_block: bytes, file_name): #发送文件数据块
+    def send_file_block(self, file_block: bytes, file_name):
         msg = (file_name + split_element).encode("utf-8") + file_block
         self.add_to_send_queue(msg)
     def send_str(self, data):
@@ -224,7 +224,7 @@ if __name__ == "__main__":
                 read_len = file_size
             else:
                 read_len = 1000
-            file_block = f.read(read_len)  #考虑以太网最大帧长为1500字节
+            file_block = f.read(read_len)  #max len 1500
             connect.send_file_block(file_block, file_name)
             file_size -= read_len
         connect.send_str("stop")
